@@ -1,0 +1,93 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Template to Create an IAM Role for lambda'
+
+Parameters:
+  
+  S3BucketName:
+    Description: Enter Bucket Name contains Source Code
+    Type: String
+
+  Sechduletimeexpression:
+    Type: String
+    Default: rate(5 minutes)
+  
+  AssumePolicyARNS:
+    Description: Assume Role Arn 
+    Type: String
+
+
+
+  S3Key:
+    Type: String
+
+  
+
+#Created Lambda trut policy &  and assign policys to role 
+Resources:
+
+  
+  AssumePolicyMaster:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      # PolicyName: Assumepolicyuser      
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+        - Effect: Allow
+          Action: "sts:AssumeRole"
+          Resource: !Ref AssumePolicyARNS
+       
+  LambdaRoleMain:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: 'LambdaRolefortest01'
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole' 
+
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AmazonEC2FullAccess'
+        - 'arn:aws:iam::aws:policy/AmazonSESFullAccess'
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+        - !Ref AssumePolicyMaster
+
+
+#Create a Lambda function with properites 
+  lambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: 'Creating lambda function'
+      FunctionName: 'LambdaFunctionMain'
+      Handler: hello.handler  
+      MemorySize: 512
+      Role: !GetAtt LambdaRoleMain.Arn 
+      Runtime: provided
+      Timeout: 300
+      Code: 
+        S3Bucket: !Ref S3BucketName
+        S3Key: !Ref S3Key
+      Layers:
+      - arn:aws:lambda:us-east-1:744348701589:layer:bash:8
+    DependsOn: LambdaRoleMain
+
+
+  EventBridgeMain:
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: Event bridge rule for lambda
+      EventBusName: default
+      Name: String
+      # RoleArn: !GetAtt lambdaFunction.Arn
+      ScheduleExpression: !Ref Sechduletimeexpression
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt lambdaFunction.Arn
+          Id: !Ref lambdaFunction
+    
+    DependsOn: lambdaFunction 
